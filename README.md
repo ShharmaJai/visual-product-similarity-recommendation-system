@@ -150,9 +150,9 @@ The final index uses:
 | Evaluation | Precision@3 | Description |
 |---|---:|---|
 | Baseline exact-product retrieval | 55.39% | Original 1280D EfficientNetB0 embeddings |
-| Fine-tuned exact-product retrieval | 59.24% | Final 512D embeddings |
-| Category-filtered exact-product retrieval | 63.21% | Exact-product search after category filtering |
-| Category-level retrieval | 87.01% | Measures whether Top-3 results belong to the correct broad category |
+| Fine-tuned exact-product retrieval | 59.46% | Final 512D embeddings |
+| Category-filtered exact-product retrieval | 63.28% | Exact-product search after category filtering |
+| Category-level retrieval | 86.67% | Measures whether Top-3 results belong to the correct broad category |
 
 ### Search performance
 
