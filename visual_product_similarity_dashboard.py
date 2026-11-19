@@ -31,7 +31,7 @@ project_root = Path(__file__).resolve().parent.parent
 processed_data_dir = (
     project_root
     / "data"
-    / "Processed"
+    / "processed"
 )
 
 raw_data_dir = (
@@ -109,43 +109,20 @@ def load_faiss_index(index_file_path):
 
 
 def preprocess_query_image(query_image):
-    resized_image = query_image.resize(
-        (224, 224)
-    )
-
-    image_array = np.array(
-        resized_image,
-        dtype=np.float32
-    )
-
-    image_batch = np.expand_dims(
-        image_array,
-        axis=0
-    )
+    resized_image = query_image.resize((224, 224))
+    image_array = np.array(resized_image, dtype=np.float32)
+    image_batch = np.expand_dims(image_array, axis=0)
 
     return image_batch
 
 
-def extract_query_embedding(
-    query_image,
-    model
-):
-    image_batch = preprocess_query_image(
-        query_image
-    )
+def extract_query_embedding(query_image, model):
+    image_batch = preprocess_query_image(query_image)
 
-    query_embedding = model.predict(
-        image_batch,
-        verbose=0
-    )
+    query_embedding = model.predict(image_batch, verbose=0)
+    query_embedding = query_embedding.astype(np.float32)
 
-    query_embedding = query_embedding.astype(
-        np.float32
-    )
-
-    faiss.normalize_L2(
-        query_embedding
-    )
+    faiss.normalize_L2(query_embedding)
 
     return query_embedding
 
@@ -156,15 +133,11 @@ def search_similar_products(
     number_of_results,
     excluded_index=None
 ):
-    additional_result = (
-        1 if excluded_index is not None else 0
-    )
+    additional_result = 1 if excluded_index is not None else 0
 
-    similarity_scores, result_indices = (
-        faiss_search_index.search(
-            query_embedding,
-            number_of_results + additional_result
-        )
+    similarity_scores, result_indices = faiss_search_index.search(
+        query_embedding,
+        number_of_results + additional_result
     )
 
     similarity_scores = similarity_scores[0]
@@ -172,21 +145,14 @@ def search_similar_products(
 
     search_results = []
 
-    for similarity_score, result_index in zip(
-        similarity_scores,
-        result_indices
-    ):
+    for similarity_score, result_index in zip(similarity_scores, result_indices):
         if result_index == excluded_index:
             continue
 
-        search_results.append(
-            {
-                "result_index": int(result_index),
-                "similarity_score": float(
-                    similarity_score
-                )
-            }
-        )
+        search_results.append({
+            "result_index": int(result_index),
+            "similarity_score": float(similarity_score)
+        })
 
         if len(search_results) == number_of_results:
             break
@@ -315,10 +281,7 @@ with search_tab:
 
     query_source = st.radio(
         "Choose Query Source",
-        options=[
-            "Upload New Image",
-            "Select Dataset Sample"
-        ],
+        options=["Upload New Image", "Select Dataset Sample"],
         horizontal=True
     )
 
@@ -329,24 +292,19 @@ with search_tab:
     query_category = None
 
     if query_source == "Upload New Image":
-
         uploaded_image = st.file_uploader(
             "Upload a product image",
             type=["jpg", "jpeg", "png"]
         )
 
         if uploaded_image is not None:
-
-            query_image = Image.open(
-                uploaded_image
-            ).convert("RGB")
+            query_image = Image.open(uploaded_image).convert("RGB")
 
             st.image(
                 query_image,
                 caption="Uploaded Query Image",
                 width=300
             )
-
         else:
             st.info(
                 "Upload a JPG, JPEG or PNG product image "
@@ -354,18 +312,14 @@ with search_tab:
             )
 
     else:
-
         selected_category = st.selectbox(
             "Select Product Category",
             options=category_options,
-            format_func=lambda category: (
-                category.replace("_", " ").title()
-            )
+            format_func=lambda category: category.replace("_", " ").title()
         )
 
         category_products = product_metadata[
-            product_metadata["category_name"]
-            == selected_category
+            product_metadata["category_name"] == selected_category
         ].copy()
 
         category_products = category_products.reset_index()
@@ -373,22 +327,13 @@ with search_tab:
         selected_product_position = st.selectbox(
             "Select Sample Image",
             options=range(len(category_products)),
-            format_func=lambda position: (
-                f"Image {position + 1}"
-            )
+            format_func=lambda position: f"Image {position + 1}"
         )
 
-        selected_product = category_products.iloc[
-            selected_product_position
-        ]
+        selected_product = category_products.iloc[selected_product_position]
 
-        query_dataset_index = int(
-            selected_product["index"]
-        )
-
-        query_category = selected_product[
-            "category_name"
-        ]
+        query_dataset_index = int(selected_product["index"])
+        query_category = selected_product["category_name"]
 
         query_image = Image.open(
             selected_product["image_path"]
@@ -396,14 +341,11 @@ with search_tab:
 
         st.image(
             query_image,
-            caption=query_category
-            .replace("_", " ")
-            .title(),
+            caption=query_category.replace("_", " ").title(),
             width=300
         )
 
     if query_image is not None:
-
         st.divider()
 
         top_k = st.slider(
@@ -414,16 +356,10 @@ with search_tab:
             step=1
         )
 
-        search_button = st.button(
-            "🔍 Find Similar Products"
-        )
+        search_button = st.button("🔍 Find Similar Products")
 
         if search_button:
-
-            with st.spinner(
-                "Searching for visually similar products..."
-            ):
-
+            with st.spinner("Searching for visually similar products..."):
                 query_embedding = extract_query_embedding(
                     query_image=query_image,
                     model=embedding_model
@@ -439,14 +375,11 @@ with search_tab:
                 )
 
                 search_end_time = time.perf_counter()
-
                 faiss_search_time_ms = (
                     search_end_time - search_start_time
                 ) * 1000
 
-            st.success(
-                "Similarity search completed successfully."
-            )
+            st.success("Similarity search completed successfully.")
 
             st.divider()
 
@@ -454,35 +387,20 @@ with search_tab:
                 f"Top-{len(search_results)} Similar Products"
             )
 
-            result_columns = st.columns(
-                len(search_results)
-            )
+            result_columns = st.columns(len(search_results))
 
-            for rank, search_result in enumerate(
-                search_results,
-                start=1
-            ):
-                result_index = search_result[
-                    "result_index"
-                ]
+            for rank, search_result in enumerate(search_results, start=1):
+                result_index = search_result["result_index"]
+                similarity_score = search_result["similarity_score"]
 
-                similarity_score = search_result[
-                    "similarity_score"
-                ]
-
-                result_product = product_metadata.iloc[
-                    result_index
-                ]
+                result_product = product_metadata.iloc[result_index]
 
                 result_image = Image.open(
                     result_product["image_path"]
                 ).convert("RGB")
 
                 with result_columns[rank - 1]:
-
-                    st.caption(
-                        f"Rank {rank}"
-                    )
+                    st.caption(f"Rank {rank}")
 
                     st.image(
                         result_image,
@@ -513,9 +431,7 @@ with search_tab:
 
             st.divider()
 
-            summary_col1, summary_col2, summary_col3, summary_col4 = (
-                st.columns(4)
-            )
+            summary_col1, summary_col2, summary_col3, summary_col4 = st.columns(4)
 
             summary_col1.metric(
                 "Products Searched",
@@ -551,65 +467,59 @@ with performance_tab:
     )
 
     st.divider()
-
     st.subheader("Key Performance Indicators")
 
-    performance_col1, performance_col2, performance_col3, performance_col4 = (
-        st.columns(4)
-    )
+    performance_col1, performance_col2, performance_col3, performance_col4 = st.columns(4)
 
     performance_col1.metric(
         label="Category Precision@3",
-        value="87.01%"
+        value="86.67%"
     )
 
     performance_col2.metric(
         label="Exact-Product Precision@3",
-        value="59.24%"
+        value="59.46%"
     )
 
     performance_col3.metric(
         label="Filtered Exact-Product Precision@3",
-        value="63.21%"
+        value="63.28%"
     )
 
     performance_col4.metric(
         label="Average FAISS Search Time",
-        value="0.0588 ms"
+        value="≈0.0549 ms"
     )
 
     st.divider()
-
     st.subheader("Baseline vs Fine-Tuned Performance")
 
-    performance_summary = pd.DataFrame(
-        {
-            "Model Stage": [
-                "Baseline EfficientNetB0",
-                "Fine-Tuned Embedding",
-                "Category-Filtered Retrieval",
-                "Category-Level Retrieval"
-            ],
-            "Embedding": [
-                "1280D",
-                "512D",
-                "512D",
-                "512D"
-            ],
-            "Evaluation Type": [
-                "Exact Product",
-                "Exact Product",
-                "Exact Product",
-                "Product Category"
-            ],
-            "Precision@3": [
-                0.5539,
-                0.5924,
-                0.6321,
-                0.8701
-            ]
-        }
-    )
+    performance_summary = pd.DataFrame({
+        "Model Stage": [
+            "Baseline EfficientNetB0",
+            "Fine-Tuned Embedding",
+            "Category-Filtered Retrieval",
+            "Category-Level Retrieval"
+        ],
+        "Embedding": [
+            "1280D",
+            "512D",
+            "512D",
+            "512D"
+        ],
+        "Evaluation Type": [
+            "Exact Product",
+            "Exact Product",
+            "Exact Product",
+            "Product Category"
+        ],
+        "Precision@3": [
+            0.5539,
+            0.5946,
+            0.6328,
+            0.8667
+        ]
+    })
 
     performance_summary["Precision@3"] = (
         performance_summary["Precision@3"] * 100
@@ -622,23 +532,13 @@ with performance_tab:
     )
 
     st.divider()
-
     st.subheader("Category-Wise Precision@3")
 
     category_precision_chart = category_performance[
-        [
-            "category_name",
-            "average_category_precision_at_3"
-        ]
+        ["category_name", "average_category_precision_at_3"]
     ].copy()
 
-    category_precision_chart[
-        "average_category_precision_at_3"
-    ] = (
-        category_precision_chart[
-            "average_category_precision_at_3"
-        ] * 100
-    )
+    category_precision_chart["average_category_precision_at_3"] *= 100
 
     category_precision_chart["category_name"] = (
         category_precision_chart["category_name"]
@@ -662,12 +562,9 @@ with performance_tab:
     )
 
     st.divider()
-
     st.subheader("Category Performance Details")
 
-    category_performance_table = (
-        category_performance.copy()
-    )
+    category_performance_table = category_performance.copy()
 
     category_performance_table["category_name"] = (
         category_performance_table["category_name"]
@@ -675,35 +572,21 @@ with performance_tab:
         .str.title()
     )
 
-    category_performance_table[
-        "average_category_precision_at_3"
-    ] = (
-        category_performance_table[
-            "average_category_precision_at_3"
-        ] * 100
+    category_performance_table["average_category_precision_at_3"] = (
+        category_performance_table["average_category_precision_at_3"] * 100
     ).round(2).astype(str) + "%"
 
-    category_performance_table[
-        "average_category_recall_at_3"
-    ] = (
-        category_performance_table[
-            "average_category_recall_at_3"
-        ] * 100
+    category_performance_table["average_category_recall_at_3"] = (
+        category_performance_table["average_category_recall_at_3"] * 100
     ).round(2).astype(str) + "%"
 
-    category_performance_table = (
-        category_performance_table.rename(
-            columns={
-                "category_name": "Category",
-                "number_of_queries": "Queries",
-                "average_category_precision_at_3": (
-                    "Category Precision@3"
-                ),
-                "average_category_recall_at_3": (
-                    "Category Recall@3"
-                )
-            }
-        )
+    category_performance_table = category_performance_table.rename(
+        columns={
+            "category_name": "Category",
+            "number_of_queries": "Queries",
+            "average_category_precision_at_3": "Category Precision@3",
+            "average_category_recall_at_3": "Category Recall@3"
+        }
     )
 
     st.dataframe(
@@ -737,7 +620,6 @@ with details_tab:
     )
 
     st.divider()
-
     st.subheader("Project Objective")
 
     st.write(
@@ -747,14 +629,12 @@ with details_tab:
     )
 
     st.divider()
-
     st.subheader("System Workflow")
 
     workflow_col1, workflow_col2, workflow_col3 = st.columns(3)
 
     with workflow_col1:
         st.caption("Input and Feature Extraction")
-
         st.write(
             """
             1. Product image is selected or uploaded  
@@ -766,7 +646,6 @@ with details_tab:
 
     with workflow_col2:
         st.caption("Embedding Generation")
-
         st.write(
             """
             1. EfficientNetB0 produces 1280D features  
@@ -778,7 +657,6 @@ with details_tab:
 
     with workflow_col3:
         st.caption("Similarity Retrieval")
-
         st.write(
             """
             1. Query embedding is L2-normalized  
@@ -789,37 +667,34 @@ with details_tab:
         )
 
     st.divider()
-
     st.subheader("Model Architecture")
 
-    architecture_table = pd.DataFrame(
-        {
-            "Component": [
-                "Input Image",
-                "Pretrained Backbone",
-                "Backbone Output",
-                "Projection Layer",
-                "Final Retrieval Embedding",
-                "Similarity Index"
-            ],
-            "Configuration": [
-                "224 × 224 × 3",
-                "EfficientNetB0",
-                "1280D",
-                "Dense 512D",
-                "512D normalized vector",
-                "FAISS HNSW"
-            ],
-            "Purpose": [
-                "Standardized model input",
-                "Extract visual product features",
-                "General visual representation",
-                "Learn product-focused features",
-                "Used for similarity search",
-                "Fast approximate nearest-neighbor retrieval"
-            ]
-        }
-    )
+    architecture_table = pd.DataFrame({
+        "Component": [
+            "Input Image",
+            "Pretrained Backbone",
+            "Backbone Output",
+            "Projection Layer",
+            "Final Retrieval Embedding",
+            "Similarity Index"
+        ],
+        "Configuration": [
+            "224 × 224 × 3",
+            "EfficientNetB0",
+            "1280D",
+            "Dense 512D",
+            "512D normalized vector",
+            "FAISS HNSW"
+        ],
+        "Purpose": [
+            "Standardized model input",
+            "Extract visual product features",
+            "General visual representation",
+            "Learn product-focused features",
+            "Used for similarity search",
+            "Fast approximate nearest-neighbor retrieval"
+        ]
+    })
 
     st.dataframe(
         architecture_table,
@@ -828,7 +703,6 @@ with details_tab:
     )
 
     st.divider()
-
     st.subheader("Technology Stack")
 
     technology_col1, technology_col2 = st.columns(2)
@@ -854,7 +728,6 @@ with details_tab:
         )
 
     st.divider()
-
     st.subheader("Dataset Summary")
 
     dataset_col1, dataset_col2, dataset_col3, dataset_col4 = st.columns(4)
@@ -880,7 +753,6 @@ with details_tab:
     )
 
     st.divider()
-
     st.subheader("Product Categories")
 
     category_names = [
@@ -888,32 +760,27 @@ with details_tab:
         for category in category_options
     ]
 
-    st.write(
-        ", ".join(category_names)
-    )
+    st.write(", ".join(category_names))
 
     st.divider()
-
     st.subheader("Evaluation Metrics")
 
-    metric_table = pd.DataFrame(
-        {
-            "Metric": [
-                "Category Precision@3",
-                "Exact-Product Precision@3",
-                "Filtered Exact-Product Precision@3",
-                "Recall@3",
-                "FAISS Search Time"
-            ],
-            "Meaning": [
-                "Measures how many Top-3 results belong to the correct category",
-                "Measures how many Top-3 results match the exact product class",
-                "Exact-product retrieval after category filtering",
-                "Measures how many relevant products were retrieved",
-                "Measures only the nearest-neighbor search duration"
-            ]
-        }
-    )
+    metric_table = pd.DataFrame({
+        "Metric": [
+            "Category Precision@3",
+            "Exact-Product Precision@3",
+            "Filtered Exact-Product Precision@3",
+            "Recall@3",
+            "FAISS Search Time"
+        ],
+        "Meaning": [
+            "Measures how many Top-3 results belong to the correct category",
+            "Measures how many Top-3 results match the exact product class",
+            "Exact-product retrieval after category filtering",
+            "Measures how many relevant products were retrieved",
+            "Measures only the nearest-neighbor search duration"
+        ]
+    })
 
     st.dataframe(
         metric_table,
@@ -922,7 +789,6 @@ with details_tab:
     )
 
     st.divider()
-
     st.subheader("Final Retrieval Pipeline")
 
     st.code(
